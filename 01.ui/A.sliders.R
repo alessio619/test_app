@@ -70,8 +70,6 @@ category_aggregation_ru <-
                    'Segment' = 'segment',
                    'Zone' = 'system_zone',
                    'Tariff Type' = 'tariff_type'),
-
-       choices = c('Cluster' = 'cluster', 'Voltage' = 'voltage', 'Client type' = 'client_type', 'Peakload vs Off-Peak' = 'peak', 'Segment' = 'macrosegment', 'Zone' = 'system_zone', 'Tariff Type' = 'tariff_type'),
        width = side_bar_width,
        selected = 'voltage',
        multiple = TRUE)
@@ -88,11 +86,6 @@ time_granularity_ru <-
        width = side_bar_width,
        selected = 'All',
        multiple = TRUE)
-       inputId = 'time_granularity_ru',
-       label = 'Time Granularity',
-       choices = c('Hourly' = 'datetime', 'Date' = 'date', 'Monthly' = 'yearmonth'),
-       width = side_bar_width,
-       selected = 'yearmonth')
 
 
 

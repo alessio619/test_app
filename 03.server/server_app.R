@@ -205,126 +205,6 @@ server_app <- function(input, output, session) {
 
         
         ## MERGE UPLOADED FILES --------
-
-## 2. Compute hourly revenues by cluster ======
-
-## 2.1 merge LV_SM_volumes_cluster and 2.LV_tariffs.xlsx by year month tariff ----
-
-lv_tariff_avgPrices[, date := NULL]
-
-lv_volumes_clusters[, tariff := as.character(tariff)]
-lv_volumes_clusters_long = merge(lv_volumes_clusters, lv_tariff_avgPrices, by = c('year', 'month', 'tariff'), all.x = TRUE) 
-
-rm(lv_volumes_clusters, lv_tariff_avgPrices)
-
-## 2.2 compute revenues -----
-## multiply delivery_volume by the tariff_value
-
-lv_volumes_clusters_long[, revenues := delivery_volume * tariff_value]
-
-
-## 3. Compute procured volumes =========
-
-## 3.1 merge  LV_SM_volumes_cluster and 3.LV_loss_factor.xlsx by year month -----
-
-lv_lossFactors[, DATE := NULL]
-
-lv_volumes_clusters_long = merge(lv_volumes_clusters_long, lv_lossFactors, by = c('year', 'month'))
-
-rm(lv_lossFactors)
-
-
-## 3.2 compute procured_volume by multiplying delivery_volume by the LV_loss_factor
-
-lv_volumes_clusters_long[, procured_volume := delivery_volume * LV_loss_factor]
-
-
-## 4. Generate a DB with total hourly procured volumes by segment =====
-
-
-lv_volumes_clusters_long[, procured_volume_segm := sum(procured_volume), by = c('date', 'hour', 'segment')]
-
-
-
-
-## 5. define sources of procured volumes by segment
-
-lv_volCosts_generation_vol = melt(lv_volCosts_generation_vol, id.vars = c('date', 'hour'), variable.name = 'segment', value.name = 'generation_volume_segm')  
-lv_volCosts_hedged_vol = melt(lv_volCosts_hedged_vol, id.vars = c('date', 'hour'), variable.name = 'segment', value.name = 'hedged_volume_segm')  
-
-lv_volumes_clusters_long = merge(lv_volumes_clusters_long, lv_volCosts_generation_vol, by = c('date', 'hour', 'segment'), all.x = TRUE)
-lv_volumes_clusters_long = merge(lv_volumes_clusters_long, lv_volCosts_hedged_vol, by = c('date', 'hour', 'segment'), all.x = TRUE)
-
-rm(lv_volCosts_hedged_vol, lv_volCosts_generation_vol)
-
-lv_volumes_clusters_long[, procured_prop := procured_volume/procured_volume_segm]
-
-
-lv_volumes_clusters_long[, hedged_volume := hedged_volume_segm * procured_prop]
-lv_volumes_clusters_long[, generation_volume := generation_volume_segm * procured_prop]
-
-lv_volumes_clusters_long[, procured_volume_segm := NULL]
-
-lv_volumes_clusters_long[, hedged_volume_segm := NULL]
-
-lv_volumes_clusters_long[, generation_volume_segm := NULL]
-
-lv_volumes_clusters_long[, open_volume := procured_volume - hedged_volume - generation_volume]
-
-
-## 7. Calculate costs ==========
-
-lv_volCosts_generation_cost = melt(lv_volCosts_generation_cost, id.vars = c('date', 'hour'), variable.name = 'segment', value.name = 'generation_unit_cost')  
-lv_volCosts_hedged_cost = melt(lv_volCosts_hedged_cost, id.vars = c('date', 'hour'), variable.name = 'segment', value.name = 'hedged_unit_cost')  
-
-lv_volumes_clusters_long = merge(lv_volumes_clusters_long, lv_volCosts_generation_cost, by = c('date', 'hour', 'segment'), all.x = TRUE)
-lv_volumes_clusters_long = merge(lv_volumes_clusters_long, lv_volCosts_hedged_cost, by = c('date', 'hour', 'segment'), all.x = TRUE)
-
-rm(lv_volCosts_hedged_cost, lv_volCosts_generation_cost)
-
-
-
-## 7.2 merge the previous point DB with the excel file 5.HPFC&costs.xlsx 
-
-lv_volumes_clusters_long = merge(lv_volumes_clusters_long, lv_HPFC_costs, by = c('date', 'hour'), all.x = TRUE)
-
-rm(lv_HPFC_costs)
-
-
-gc()
-
-
-lv_volumes_clusters_long[, hedged_cost := hedged_unit_cost *  hedged_volume]
-lv_volumes_clusters_long[, generation_cost := generation_unit_cost * generation_volume]
-lv_volumes_clusters_long[, open_cost := HPFC * open_volume]
-lv_volumes_clusters_long[, balancing_cost := procured_volume * balancing_cost]
-lv_volumes_clusters_long[, uplift_cost := procured_volume * uplift_cost]
-lv_volumes_clusters_long[, OPEX_cost := procured_volume * OPEX_cost]
-lv_volumes_clusters_long[, total_cost := hedged_cost + generation_cost + open_cost + balancing_cost + uplift_cost + OPEX_cost]
-
-## 8. compute margin: revenues - total_cost ============
-
-lv_volumes_clusters_long[, margin := revenues - total_cost]
-
-
-## 9.  generate a variable for peak/off peak hours: peak == 1 if hour > 8 & hour < 21, 0 otherwise =========
-
-lv_volumes_clusters_long[, peak := fifelse(hour > 8 & hour < 21, 0, 1)]
-
-
-## 10. drop unit costs variables (hedged_unit_cost, HPFC, ...)
-
-lv_volumes_clusters_long[, HPFC := NULL]
-lv_volumes_clusters_long[, hedged_unit_cost := NULL]
-lv_volumes_clusters_long[, generation_unit_cost := NULL]
-lv_volumes_clusters_long[, SECTOR := NULL]
-lv_volumes_clusters_long[, type_viz := 'expected']
-
-data_ru_all = lv_volumes_clusters_long
-
-data_ru_all[, yearmonth := format(date, "%Y-%m")]
-
-        summed_ru_all <- summary_upload(data_ru_all)
         
         list_df = list(data_ru_lv, data_ru_mv, data_ru_hv, data_ru_eds)
         list_df = list_df[!is.na(list_df)]
@@ -438,9 +318,6 @@ data_ru_all[, yearmonth := format(date, "%Y-%m")]
     
 ## 1. REGULAR UPDATE ----------------------------------------------------------------------------------------------------------
     
-            data_ru_all = na.omit(data_ru_all)
-         
-
 
 ### a. Execute & Visualize --------------------------------------------------    
      
@@ -484,9 +361,6 @@ data_ru_all[, yearmonth := format(date, "%Y-%m")]
 
 
                      
-
-         dts_ru_general = reactive(data_ru_all[date >= input$daterange_ru[1] & date <= input$daterange_ru[2]])
-         
     
                 
                 
@@ -655,24 +529,6 @@ data_ru_all[, yearmonth := format(date, "%Y-%m")]
                                                        # tot_revenues & Margin
                                                        tot_revenues = sum(tot_revenues, na.rm = TRUE),
                                                        tot_margin = sum(tot_margin, na.rm = TRUE)),
-                                                       tot_delivery_volume = sum(delivery_volume, na.rm = TRUE),
-                                                       tot_procured_volume = sum(procured_volume, na.rm = TRUE),
-                                                       tot_hedged_volume = sum(hedged_volume, na.rm = TRUE),
-                                                       tot_generation_volume = sum(generation_volume, na.rm = TRUE),
-                                                       tot_open_volume = sum(open_volume, na.rm = TRUE),
-                                                       
-                                                       # Costs
-                                                       tot_total_cost = sum(total_cost, na.rm = TRUE),
-                                                       tot_hedged_cost = sum(hedged_cost, na.rm = TRUE),
-                                                       tot_generation_cost = sum(generation_cost, na.rm = TRUE),
-                                                       tot_open_cost = sum(open_cost, na.rm = TRUE),
-                                                       tot_balancing_cost = sum(balancing_cost, na.rm = TRUE),
-                                                       tot_uplift_cost = sum(uplift_cost, na.rm = TRUE),
-                                                       tot_OPEX_cost = sum(OPEX_cost, na.rm = TRUE),
-                                                       
-                                                       # Revenues & Margin
-                                                       tot_revenues = sum(revenues, na.rm = TRUE),
-                                                       tot_margin = sum(margin, na.rm = TRUE)),
                                                    
                                                    keyby = aggregators_ru_2] 
                        
@@ -771,24 +627,6 @@ data_ru_all[, yearmonth := format(date, "%Y-%m")]
                                                        # tot_revenues & Margin
                                                        tot_revenues = sum(tot_revenues, na.rm = TRUE),
                                                        tot_margin = sum(tot_margin, na.rm = TRUE))] 
-                                                       tot_delivery_volume = sum(delivery_volume, na.rm = TRUE),
-                                                       tot_procured_volume = sum(procured_volume, na.rm = TRUE),
-                                                       tot_hedged_volume = sum(hedged_volume, na.rm = TRUE),
-                                                       tot_generation_volume = sum(generation_volume, na.rm = TRUE),
-                                                       tot_open_volume = sum(open_volume, na.rm = TRUE),
-                                                       
-                                                       # Costs
-                                                       tot_total_cost = sum(total_cost, na.rm = TRUE),
-                                                       tot_hedged_cost = sum(hedged_cost, na.rm = TRUE),
-                                                       tot_generation_cost = sum(generation_cost, na.rm = TRUE),
-                                                       tot_open_cost = sum(open_cost, na.rm = TRUE),
-                                                       tot_balancing_cost = sum(balancing_cost, na.rm = TRUE),
-                                                       tot_uplift_cost = sum(uplift_cost, na.rm = TRUE),
-                                                       tot_OPEX_cost = sum(OPEX_cost, na.rm = TRUE),
-                                                       
-                                                       # Revenues & Margin
-                                                       tot_revenues = sum(revenues, na.rm = TRUE),
-                                                       tot_margin = sum(margin, na.rm = TRUE))] 
 
 
 
@@ -2212,31 +2050,6 @@ data_ru_all[, yearmonth := format(date, "%Y-%m")]
 					            	dts_ru_2 = melt(dts_ru_2, id.vars = c('groupped'),
                                         
                                                   measure.vars = c('unit_total_cost'), variable.name = 'components', value.name = 'values')
-
-                                                
-                        saveRDS(data_ru_all, file = odir_rds)
-                        
-                        
-                        
-                        data_ru_all_csv = data_ru_all[, .(tot_procured_volume = sum(procured_volume),
-                                                           tot_delivery_volume = sum(delivery_volume),
-                                                           tot_hedged_volume = sum(hedged_volume),
-                                                           tot_open_volume = sum(open_volume),
-                                                           tot_revenues = sum(revenues),
-                                                           tot_hedged_cost = sum(hedged_cost),
-                                                           tot_open_cost = sum(open_cost),
-                                                           tot_balancing_cost = sum(balancing_cost),
-                                                           tot_uplift_cost = sum(uplift_cost),
-                                                           tot_OPEX_cost = sum(OPEX_cost),
-                                                           tot_total_cost = sum(total_cost),
-                                                           tot_margin = sum(margin)),
-                                                    keyby = c('yearmonth', 'segment')]
-                        
-                        
-                        
-                        fwrite(data_ru_all_csv, file = odir_csv)
-                      
-                        saveRDS(data_ru_all, file = odir_temp)
                         
  
 
@@ -2732,7 +2545,7 @@ data_ru_all[, yearmonth := format(date, "%Y-%m")]
                 
                       setwd('..')
                       
-    archive = file.path(getwd(), input$selectpath,  'Archive')       
+    archive = file.path(getwd(), input$selectpath, '6.Sales.Matrix','LV', 'Archive')       
 
    if (file.exists(paste(archive, paste(Sys.Date(), input$export_name_ru_user, sep = '_'), sep = "/", collapse = "/"))) {
      archive.date = paste(archive, paste(Sys.Date(), input$export_name_ru_user, sep = '_'), sep = "/", collapse = "/")
@@ -2752,9 +2565,9 @@ data_ru_all[, yearmonth := format(date, "%Y-%m")]
                       
                       ### Save files into the Archive
                         
-                        odir_rds = file.path(getwd(), 'Archive', archive_name)
+                        odir_rds = file.path(getwd(), 'regular_run', '6.Sales.Matrix', 'Group-SM', 'Archive', archive_name)
 
-                        odir_csv = file.path(getwd(), 'Archive', archive_name_summary)
+                        odir_csv = file.path(getwd(), 'regular_run', '6.Sales.Matrix', 'Group-SM', 'Archive', archive_name_summary)
 
 
                         

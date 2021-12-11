@@ -141,6 +141,13 @@ sidebar_analysis_ru <-
       br(),
       br(),
    
+      
+
+      uiOutput('archive_button'),
+   
+      br(),
+      
+
 
       button_analysis_download_ru,
    
